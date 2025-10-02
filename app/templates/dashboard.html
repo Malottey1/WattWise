@@ -9,7 +9,7 @@
         <h5 class="card-title">Latest Reading</h5>
         {% if latest %}
           <p><strong>Device:</strong> {{ latest.device.device_name if latest.device else ("Device #" ~ latest.device_id) }}</p>
-          <p><strong>Energy (kW approx):</strong> <span id="latest-energy">{{ latest.energy_consumed }}</span> kW</p>
+          <p><strong>Energy (kW):</strong> <span id="latest-energy">{{ latest.energy_consumed }}</span> kW</p>
           <p><strong>Voltage:</strong> {{ latest.voltage or "N/A" }}</p>
           <p><strong>Time:</strong> {{ latest.timestamp.strftime("%Y-%m-%d %H:%M") }}</p>
         {% else %}
@@ -25,14 +25,14 @@
         <h5 class="card-title">Live Summary</h5>
         <div class="d-flex justify-content-between">
           <div>
-            <p>Total Live Cost: <strong id="live-cost">0.00</strong></p>
-            <p>Total Carbon (kg CO₂): <strong id="live-carbon">0.00</strong></p>
-            <p>Active Devices: <strong id="active-devices">0</strong></p>
+            <p>Total Live Cost: <strong id="live-cost">{{ "%.3f"|format(total_cost) }}</strong></p>
+            <p>Total Carbon (kg CO₂): <strong id="live-carbon">{{ "%.3f"|format(total_carbon) }}</strong></p>
+            <p>Active Devices: <strong id="active-devices">{{ active_devices }}</strong></p>
           </div>
           <div style="width:220px;">
             <h6 class="text-center">Usage Gauge</h6>
             <div class="progress" style="height:28px;">
-              <div id="usage-gauge" class="progress-bar" role="progressbar" style="width: 0%">0%</div>
+              <div id="usage-gauge" class="progress-bar" role="progressbar" style="width: {{ usage_percent }}%">{{ usage_percent }}%</div>
             </div>
             <p class="small text-muted mt-2">Color: green=normal, yellow=high, red=very high</p>
           </div>
@@ -121,13 +121,13 @@
   </div>
 </div>
 
+
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  // initial data from server-rendered readings
+  // ---- INITIAL CHART (from historical txt file) ----
   const initialLabels = {{ readings | map(attribute='timestamp') | list | tojson }};
-  const initialActualData = {{ readings | map(attribute='energy_consumed') | list | tojson }};
-  const initialPredData = {{ predictions | map(attribute='predicted_consumption') | list | tojson if predictions else [] }};
+  const initialEnergyData = {{ readings | map(attribute='energy_consumed') | list | tojson }};
 
   const ctx = document.getElementById('energyChart').getContext('2d');
   const energyChart = new Chart(ctx, {
@@ -136,47 +136,65 @@
       labels: initialLabels,
       datasets: [
         { 
-          label: 'Actual (kW approx)', 
-          data: initialActualData, 
+          label: 'Energy (kW)', 
+          data: initialEnergyData, 
           borderWidth: 2, 
           fill: true, 
           tension: 0.3,
           borderColor: 'rgb(75, 192, 192)',
           backgroundColor: 'rgba(75, 192, 192, 0.1)'
-        },
-        { 
-          label: 'Predicted (kW)', 
-          data: initialPredData, 
-          borderWidth: 2, 
-          fill: false, 
-          tension: 0.3,
-          borderColor: 'rgb(255, 99, 132)',
-          borderDash: [5, 5]
         }
       ]
     },
     options: { 
       responsive: true, 
+      animation: false, // disable animations for low CPU
       plugins: { legend: { position: 'top' } },
       scales: {
         y: {
           beginAtZero: true,
-          title: {
-            display: true,
-            text: 'Energy (kW)'
-          }
+          title: { display: true, text: 'Energy (kW)' }
         },
         x: {
-          title: {
-            display: true,
-            text: 'Time'
-          }
+          title: { display: true, text: 'Time' }
         }
       }
     }
   });
 
-  // update device info by polling the backend
+  // ---- STREAM LIVE DATA via SSE ----
+  const evtSource = new EventSource("/api/live_data");
+
+  evtSource.onmessage = function(event) {
+    try {
+      const data = JSON.parse(event.data);
+      const label = new Date(data.timestamp).toLocaleTimeString();
+
+      // --- update chart ---
+      energyChart.data.labels.push(label);
+      energyChart.data.datasets[0].data.push(data.energy_consumed);
+      if (energyChart.data.labels.length > 100) {
+        energyChart.data.labels.shift();
+        energyChart.data.datasets[0].data.shift();
+      }
+      energyChart.update("none");
+
+      // --- update "Latest Reading" card instantly ---
+      const latestEnergy = document.getElementById("latest-energy");
+      if (latestEnergy) {
+        latestEnergy.innerText = data.energy_consumed.toFixed(3);
+      }
+      const latestTime = document.getElementById("latest-time");
+      if (latestTime) {
+        latestTime.innerText = new Date(data.timestamp).toLocaleString();
+      }
+
+    } catch (err) {
+      console.error("Error parsing SSE:", err);
+    }
+  };
+
+  // ---- POLL METRICS (summary totals, devices, costs, carbon) ----
   async function fetchLatestMetrics(){
     try {
       const resp = await fetch('/api/latest_metrics');
@@ -200,26 +218,13 @@
           totalCarbon += parseFloat(dev.carbon_kg || 0);
           usageSum += Math.abs(parseFloat(dev.last_reading) || 0);
         }
-        
-        // append point to chart for the first device to visualize live trend (demo)
-        if (dev.device_id && dev.device_id === {{ devices[0].id if devices and devices|length>0 else 'null' }} ) {
-          const label = new Date(dev.timestamp).toLocaleTimeString();
-          energyChart.data.labels.push(label);
-          energyChart.data.datasets[0].data.push(dev.last_reading);
-          // keep dataset length bounded
-          if (energyChart.data.labels.length > 60){
-            energyChart.data.labels.shift();
-            energyChart.data.datasets[0].data.shift();
-          }
-          energyChart.update();
-        }
       });
 
       document.getElementById('live-cost').innerText = totalCost.toFixed(3);
       document.getElementById('live-carbon').innerText = totalCarbon.toFixed(3);
       document.getElementById('active-devices').innerText = activeCount;
 
-      // usage gauge percent: normalize usageSum to heuristic max (e.g., 5 kW)
+      // usage gauge percent
       const maxExpected = 5.0 * (activeCount || 1);
       const percent = Math.min(100, Math.round((usageSum / (maxExpected || 1)) * 100));
       const gauge = document.getElementById('usage-gauge');
@@ -234,12 +239,11 @@
     }
   }
 
-  // Poll every 8 seconds
-  setInterval(fetchLatestMetrics, 8000);
-  // initial fetch
+  // Poll metrics every 20s (less frequent than before)
+  setInterval(fetchLatestMetrics, 20000);
   fetchLatestMetrics();
 
-  // Start / stop simulation buttons
+  // ---- SIMULATION BUTTONS ----
   document.querySelectorAll('.start-sim').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const id = e.target.dataset.deviceId;
@@ -247,12 +251,11 @@
         const response = await fetch('/api/start_simulation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ device_id: id, interval: 10, use_model: true })
+          body: JSON.stringify({ device_id: id, interval: 10, use_model: false })
         });
         
         if (response.ok) {
           btn.disabled = true;
-          // Update status badge to indicate simulating
           const row = btn.closest('tr');
           const statusBadge = row.querySelector('.badge');
           if (statusBadge) {
@@ -277,11 +280,8 @@
         });
         
         if (response.ok) {
-          // re-enable start button
           const startBtn = document.querySelector('.start-sim[data-device-id="' + id + '"]');
           if (startBtn) startBtn.disabled = false;
-          
-          // Update status badge back to connected
           const row = btn.closest('tr');
           const statusBadge = row.querySelector('.badge');
           if (statusBadge) {
@@ -295,4 +295,5 @@
     });
   });
 </script>
+
 {% endblock %}

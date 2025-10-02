@@ -1,9 +1,162 @@
 {% extends "base.html" %}
+
 {% block content %}
-<div class="card shadow">
-  <div class="card-body">
-    <h3>🔮 Predictions Hub</h3>
-    <p>Future energy demand forecasts will be displayed here.</p>
+<div class="container">
+  <h1 class="text-center mb-4">🤖 AI Prediction Hub</h1>
+  <p class="lead text-center">
+    24-hour energy consumption forecast powered by LSTM neural networks
+  </p>
+
+  <!-- Forecast Controls -->
+  <div class="card mb-4">
+    <div class="card-header bg-primary text-white">Forecast Controls</div>
+    <div class="card-body">
+      <form id="forecast-form" class="row g-3">
+        <div class="col-md-4">
+          <label for="adjustment" class="form-label">Adjustment Factor</label>
+          <select class="form-select" id="adjustment">
+            <option value="-30">-30%</option>
+            <option value="0" selected>0%</option>
+            <option value="30">+30%</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label for="horizon" class="form-label">Forecast Horizon (hours)</label>
+          <input type="number" id="horizon" class="form-control" value="24" min="1" max="72">
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+          <button type="submit" class="btn btn-success w-100">Generate Forecast</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Model Info -->
+  <div class="card mb-4">
+    <div class="card-header bg-info text-white">Model Information</div>
+    <div class="card-body">
+      <p><strong>Type:</strong> LSTM Sequence-to-Sequence</p>
+      <p><strong>Horizon:</strong> 24 hours</p>
+      <p><strong>Update:</strong> Real-time</p>
+    </div>
+  </div>
+
+  <!-- Forecast Graph -->
+  <div class="card mb-4">
+    <div class="card-header bg-dark text-white">24-Hour Energy Forecast</div>
+    <div class="card-body">
+      <canvas id="forecastChart" height="120"></canvas>
+    </div>
+  </div>
+
+  <!-- Peak Usage Analysis -->
+  <div class="card mb-4">
+    <div class="card-header bg-warning text-dark">Peak Usage Analysis</div>
+    <div class="card-body" id="peak-usage">
+      <p>No forecast generated yet.</p>
+    </div>
+  </div>
+
+  <!-- Hourly Breakdown -->
+  <div class="card mb-4">
+    <div class="card-header bg-secondary text-white">Hourly Breakdown</div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-striped" id="forecastTable">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Predicted (kW)</th>
+              <th>Estimated Cost ($)</th>
+              <th>Status</th>
+              <th>Recommendation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="5" class="text-center">Generate a forecast to see hourly predictions</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
+
+<!-- Chart.js & Custom Script -->
+<!-- Chart.js & Custom Script -->
+<!-- ✅ Load Chart.js before using it -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.getElementById('forecast-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const adjustment = document.getElementById('adjustment').value;
+  const horizon = document.getElementById('horizon').value;
+
+  const res = await fetch(`/api/forecast?adjustment=${adjustment}&horizon=${horizon}`);
+  const data = await res.json();
+
+  console.log("Forecast API Data:", data);
+
+  // Update Chart
+  const ctx = document.getElementById('forecastChart').getContext('2d');
+
+  // ✅ Safely destroy previous chart if it exists
+  const existingChart = Chart.getChart(ctx.canvas);
+  if (existingChart) {
+    existingChart.destroy();
+  }
+
+  window.forecastChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.map(d => new Date(d.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})),
+      datasets: [{
+        label: 'Predicted kW',
+        data: data.map(d => d.predicted),
+        borderColor: 'rgba(75, 192, 192, 1)',
+        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        fill: true,
+        tension: 0.2,
+        pointRadius: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: true } },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: "kW" }
+        }
+      }
+    }
+  });
+
+  // Update Table
+  const tbody = document.querySelector('#forecastTable tbody');
+  tbody.innerHTML = '';
+  data.forEach(row => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${new Date(row.timestamp).toLocaleString()}</td>
+        <td>${row.predicted.toFixed(2)}</td>
+        <td>${row.estimated_cost ? row.estimated_cost.toFixed(2) : "-"}</td>
+        <td>${row.status || "-"}</td>
+        <td>${row.recommendation || "-"}</td>
+      </tr>
+    `;
+  });
+
+  // Update Peak Usage
+  const max = data.reduce((a, b) => a.predicted > b.predicted ? a : b);
+  document.getElementById('peak-usage').innerHTML = `
+    <p><strong>Peak Hour:</strong> ${new Date(max.timestamp).toLocaleString()}</p>
+    <p><strong>Predicted Usage:</strong> ${max.predicted.toFixed(2)} kW</p>
+    <p><strong>Recommendation:</strong> ${max.recommendation || "-"}</p>
+  `;
+});
+</script>
+
+
+
 {% endblock %}

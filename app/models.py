@@ -18,7 +18,7 @@ class User(db.Model, UserMixin):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     devices = db.relationship("Device", backref="owner", lazy=True)
-    readings = db.relationship("EnergyReading", backref="user", lazy=True)
+    # REMOVED: readings relationship since EnergyReading no longer has user_id
     predictions = db.relationship("Prediction", backref="user", lazy=True)
     recommendations = db.relationship("Recommendation", backref="user", lazy=True)
     savings = db.relationship("SavingsLog", backref="user", lazy=True)
@@ -33,22 +33,25 @@ class Device(db.Model):
     device_type = db.Column(db.String(50))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    readings = db.relationship("EnergyReading", backref="device", lazy=True)
+    # REMOVED: readings relationship since EnergyReading no longer has device_id
 
 
 class EnergyReading(db.Model):
     __tablename__ = "energy_readings"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    device_id = db.Column(db.Integer, db.ForeignKey("devices.id"), nullable=True)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    energy_consumed = db.Column(db.Float, nullable=False)
+    #device_id = db.Column(db.Integer, db.ForeignKey("devices.id"), nullable=False)  # <-- add this
+    timestamp = db.Column(db.DateTime, nullable=False)
+    global_active_power = db.Column(db.Float, nullable=False)
+    global_reactive_power = db.Column(db.Float, nullable=False)
     voltage = db.Column(db.Float)
     global_intensity = db.Column(db.Float)
     sub_metering_1 = db.Column(db.Float)
     sub_metering_2 = db.Column(db.Float)
     sub_metering_3 = db.Column(db.Float)
+
+    #device = db.relationship("Device", backref="readings")
+
 
 
 class Prediction(db.Model):
