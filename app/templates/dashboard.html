@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">Your Dashboard</h2>
+
+<div class="row">
+  <div class="col-md-4">
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Latest Reading</h5>
+        {% if latest %}
+          <p><strong>Device:</strong> {{ latest.device.device_name if latest.device else ("Device #" ~ latest.device_id) }}</p>
+          <p><strong>Energy (kW approx):</strong> <span id="latest-energy">{{ latest.energy_consumed }}</span> kW</p>
+          <p><strong>Voltage:</strong> {{ latest.voltage or "N/A" }}</p>
+          <p><strong>Time:</strong> {{ latest.timestamp.strftime("%Y-%m-%d %H:%M") }}</p>
+        {% else %}
+          <p>No readings yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Live Summary</h5>
+        <div class="d-flex justify-content-between">
+          <div>
+            <p>Total Live Cost: <strong id="live-cost">0.00</strong></p>
+            <p>Total Carbon (kg CO₂): <strong id="live-carbon">0.00</strong></p>
+            <p>Active Devices: <strong id="active-devices">0</strong></p>
+          </div>
+          <div style="width:220px;">
+            <h6 class="text-center">Usage Gauge</h6>
+            <div class="progress" style="height:28px;">
+              <div id="usage-gauge" class="progress-bar" role="progressbar" style="width: 0%">0%</div>
+            </div>
+            <p class="small text-muted mt-2">Color: green=normal, yellow=high, red=very high</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Devices list -->
+<div class="card shadow-sm mt-2">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center">
+      <h5 class="card-title">Connected Devices</h5>
+      <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addDeviceModal">➕ Connect Device</button>
+    </div>
+
+    {% if devices %}
+      <table class="table mt-3">
+        <thead>
+          <tr><th>Device</th><th>Type</th><th>Status</th><th>Last Reading</th><th>Cost</th><th>Carbon (kg)</th><th>Sim</th></tr>
+        </thead>
+        <tbody id="deviceTable">
+          {% for d in devices %}
+          <tr data-device-id="{{ d.id }}">
+            <td>{{ d.device_name }}</td>
+            <td>{{ d.device_type }}</td>
+            <td><span class="badge bg-success">Connected</span></td>
+            <td id="reading-{{ d.id }}">--</td>
+            <td id="cost-{{ d.id }}">--</td>
+            <td id="carbon-{{ d.id }}">--</td>
+            <td>
+              <button class="btn btn-sm btn-outline-success start-sim" data-device-id="{{ d.id }}">Start</button>
+              <button class="btn btn-sm btn-outline-danger stop-sim" data-device-id="{{ d.id }}">Stop</button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="text-muted mt-3">No devices connected yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Add Device Modal -->
+<div class="modal fade" id="addDeviceModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="POST" action="{{ url_for('main.add_device') }}" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Connect Device</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Device Name</label>
+          <input type="text" class="form-control" name="device_name" placeholder="Smart Meter" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Device Type</label>
+          <select name="device_type" class="form-select" required>
+            <option>Smart Meter</option>
+            <option>Air Conditioner</option>
+            <option>Fridge</option>
+            <option>Solar Panel</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="simulate" id="simulateSwitch">
+          <label class="form-check-label" for="simulateSwitch">Simulate Data</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-success">Add Device</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Chart area -->
+<div class="card shadow-sm mt-4">
+  <div class="card-body">
+    <h5 class="card-title">Energy Usage Trends (Most recent readings)</h5>
+    <canvas id="energyChart" height="120"></canvas>
+  </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // initial data from server-rendered readings
+  const initialLabels = {{ readings | map(attribute='timestamp') | list | tojson }};
+  const initialActualData = {{ readings | map(attribute='energy_consumed') | list | tojson }};
+  const initialPredData = {{ predictions | map(attribute='predicted_consumption') | list | tojson if predictions else [] }};
+
+  const ctx = document.getElementById('energyChart').getContext('2d');
+  const energyChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: initialLabels,
+      datasets: [
+        { 
+          label: 'Actual (kW approx)', 
+          data: initialActualData, 
+          borderWidth: 2, 
+          fill: true, 
+          tension: 0.3,
+          borderColor: 'rgb(75, 192, 192)',
+          backgroundColor: 'rgba(75, 192, 192, 0.1)'
+        },
+        { 
+          label: 'Predicted (kW)', 
+          data: initialPredData, 
+          borderWidth: 2, 
+          fill: false, 
+          tension: 0.3,
+          borderColor: 'rgb(255, 99, 132)',
+          borderDash: [5, 5]
+        }
+      ]
+    },
+    options: { 
+      responsive: true, 
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Energy (kW)'
+          }
+        },
+        x: {
+          title: {
+            display: true,
+            text: 'Time'
+          }
+        }
+      }
+    }
+  });
+
+  // update device info by polling the backend
+  async function fetchLatestMetrics(){
+    try {
+      const resp = await fetch('/api/latest_metrics');
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const devices = data.devices || [];
+      let totalCost = 0, totalCarbon = 0, activeCount = 0, usageSum = 0;
+      
+      devices.forEach(dev => {
+        const rid = document.getElementById('reading-' + dev.device_id);
+        const cid = document.getElementById('cost-' + dev.device_id);
+        const carb = document.getElementById('carbon-' + dev.device_id);
+        
+        if (rid) rid.innerText = dev.last_reading !== null ? dev.last_reading + ' kW' : '--';
+        if (cid) cid.innerText = dev.cost ? dev.cost.toFixed(3) : '--';
+        if (carb) carb.innerText = dev.carbon_kg ? dev.carbon_kg.toFixed(3) : '--';
+        
+        if (dev.last_reading !== null) {
+          activeCount++;
+          totalCost += parseFloat(dev.cost || 0);
+          totalCarbon += parseFloat(dev.carbon_kg || 0);
+          usageSum += Math.abs(parseFloat(dev.last_reading) || 0);
+        }
+        
+        // append point to chart for the first device to visualize live trend (demo)
+        if (dev.device_id && dev.device_id === {{ devices[0].id if devices and devices|length>0 else 'null' }} ) {
+          const label = new Date(dev.timestamp).toLocaleTimeString();
+          energyChart.data.labels.push(label);
+          energyChart.data.datasets[0].data.push(dev.last_reading);
+          // keep dataset length bounded
+          if (energyChart.data.labels.length > 60){
+            energyChart.data.labels.shift();
+            energyChart.data.datasets[0].data.shift();
+          }
+          energyChart.update();
+        }
+      });
+
+      document.getElementById('live-cost').innerText = totalCost.toFixed(3);
+      document.getElementById('live-carbon').innerText = totalCarbon.toFixed(3);
+      document.getElementById('active-devices').innerText = activeCount;
+
+      // usage gauge percent: normalize usageSum to heuristic max (e.g., 5 kW)
+      const maxExpected = 5.0 * (activeCount || 1);
+      const percent = Math.min(100, Math.round((usageSum / (maxExpected || 1)) * 100));
+      const gauge = document.getElementById('usage-gauge');
+      gauge.style.width = percent + '%';
+      gauge.innerText = percent + '%';
+      gauge.classList.remove('bg-success','bg-warning','bg-danger');
+      if (percent < 50) gauge.classList.add('bg-success');
+      else if (percent < 80) gauge.classList.add('bg-warning');
+      else gauge.classList.add('bg-danger');
+    } catch (err) {
+      console.error('fetchLatestMetrics error', err);
+    }
+  }
+
+  // Poll every 8 seconds
+  setInterval(fetchLatestMetrics, 8000);
+  // initial fetch
+  fetchLatestMetrics();
+
+  // Start / stop simulation buttons
+  document.querySelectorAll('.start-sim').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.dataset.deviceId;
+      try {
+        const response = await fetch('/api/start_simulation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ device_id: id, interval: 10, use_model: true })
+        });
+        
+        if (response.ok) {
+          btn.disabled = true;
+          // Update status badge to indicate simulating
+          const row = btn.closest('tr');
+          const statusBadge = row.querySelector('.badge');
+          if (statusBadge) {
+            statusBadge.className = 'badge bg-warning';
+            statusBadge.textContent = 'Simulating';
+          }
+        }
+      } catch (err) {
+        console.error('Error starting simulation:', err);
+      }
+    });
+  });
+  
+  document.querySelectorAll('.stop-sim').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.dataset.deviceId;
+      try {
+        const response = await fetch('/api/stop_simulation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ device_id: id })
+        });
+        
+        if (response.ok) {
+          // re-enable start button
+          const startBtn = document.querySelector('.start-sim[data-device-id="' + id + '"]');
+          if (startBtn) startBtn.disabled = false;
+          
+          // Update status badge back to connected
+          const row = btn.closest('tr');
+          const statusBadge = row.querySelector('.badge');
+          if (statusBadge) {
+            statusBadge.className = 'badge bg-success';
+            statusBadge.textContent = 'Connected';
+          }
+        }
+      } catch (err) {
+        console.error('Error stopping simulation:', err);
+      }
+    });
+  });
+</script>
+{% endblock %}

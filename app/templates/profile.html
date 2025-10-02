@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+  <h2 class="mb-4">Profile</h2>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <h5 class="card-title">User Information</h5>
+      <p><strong>Username:</strong> {{ user.username }}</p>
+      <p><strong>Email:</strong> {{ user.email }}</p>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <h5 class="card-title">Your Devices</h5>
+      {% if devices %}
+        <ul>
+          {% for d in devices %}
+            <li>{{ d.device_name }} ({{ d.device_type }})</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p>No devices registered.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h5 class="card-title">Usage Summary</h5>
+      {% if stats %}
+        <p>Total Readings: {{ stats.total_readings }}</p>
+        <p>Average Consumption: {{ "%.2f"|format(stats.avg_consumption) }} kWh</p>
+      {% else %}
+        <p>No usage data available yet.</p>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
