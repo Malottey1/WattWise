@@ -21,7 +21,6 @@ from functools import wraps
 
 import traceback
 from sqlalchemy import func
-import datetime
 from flask import Response, stream_with_context
 from app.utils.data_stream import simulate_live_stream
 from flask import Blueprint, render_template, request, jsonify
@@ -52,32 +51,51 @@ def home():
 # -----------------
 @bp.route("/register", methods=["GET", "POST"])
 def register():
-    form = RegistrationForm()
-    if form.validate_on_submit():
-        hashed_pw = bcrypt.generate_password_hash(form.password.data).decode("utf-8")
-        user = User(
-            name=form.name.data,
-            email=form.email.data,
-            password_hash=hashed_pw
-        )
+    if request.method == "POST":
+        name = request.form.get("name")
+        email = request.form.get("email")
+        password = request.form.get("password")
+        confirm = request.form.get("confirm_password")
+        
+        if not all([name, email, password, confirm]):
+            flash("All fields are required", "danger")
+            return render_template("register.html")
+        
+        if password != confirm:
+            flash("Passwords do not match", "danger")
+            return render_template("register.html")
+        
+        if User.query.filter_by(email=email).first():
+            flash("Email already registered", "danger")
+            return render_template("register.html")
+        
+        hashed_pw = bcrypt.generate_password_hash(password).decode("utf-8")
+        user = User(name=name, email=email, password_hash=hashed_pw)
         db.session.add(user)
         db.session.commit()
         flash("Account created! Please log in.", "success")
         return redirect(url_for("main.login"))
-    return render_template("register.html", form=form)
-
-
+    
+    return render_template("register.html")
 @bp.route("/login", methods=["GET", "POST"])
 def login():
-    form = LoginForm()
-    if form.validate_on_submit():
-        user = User.query.filter_by(email=form.email.data).first()
-        if user and bcrypt.check_password_hash(user.password_hash, form.password.data):
+    if request.method == "POST":
+        email = request.form.get("email")
+        password = request.form.get("password")
+        
+        if not email or not password:
+            flash("Please enter both email and password", "danger")
+            return render_template("login.html")
+        
+        user = User.query.filter_by(email=email).first()
+        if user and bcrypt.check_password_hash(user.password_hash, password):
             login_user(user)
+            flash("Logged in successfully!", "success")
             return redirect(url_for("main.dashboard"))
         else:
             flash("Login failed. Please check email and password.", "danger")
-    return render_template("login.html", form=form)
+    
+    return render_template("login.html")
 
 
 @bp.route("/logout")
@@ -264,6 +282,7 @@ def api_list_simulations():
 
 
 @bp.route("/api/latest_metrics")
+@login_required
 def api_latest_metrics():
     """
     Return latest reading per device for current user + cost/carbon metrics.
@@ -327,38 +346,78 @@ def api_latest_metrics():
 
 
 
-# -----------------
-# History
-# -----------------
-@bp.route("/history")
- 
-def history():
-    readings = EnergyReading.query.filter_by(user_id=current_user.id)\
-        .order_by(EnergyReading.timestamp.desc()).all()
-    return render_template("history.html", readings=readings)
+
 
 
 # -----------------
 # Profile
 # -----------------
 @bp.route("/profile")
- 
+@login_required
 def profile():
     user = current_user
 
+    # Get all devices for this user
     devices = Device.query.filter_by(user_id=user.id).all()
+    device_count = len(devices)
 
-    total_readings = db.session.query(func.count(EnergyReading.id))\
-        .filter_by(user_id=user.id).scalar()
-    avg_consumption = db.session.query(func.avg(EnergyReading.energy_consumed))\
-        .filter_by(user_id=user.id).scalar()
+    # Simulate usage summary
+    usage_summary = []
+    total_kwh = 0
+    total_cost = 0
+    emission_factor = 0.233
+    tariff_rate = 0.20
 
-    stats = {
-        "total_readings": total_readings or 0,
-        "avg_consumption": avg_consumption or 0.0,
-    }
+    for d in devices:
+        kwh = round(random.uniform(0.1, 2.0), 2)
+        cost = kwh * tariff_rate
+        carbon = kwh * emission_factor
+        usage_summary.append({
+            "device_name": d.device_name,
+            "device_type": d.device_type,
+            "kwh": kwh,
+            "cost": round(cost, 2),
+            "carbon": round(carbon, 2)
+        })
+        total_kwh += kwh
+        total_cost += cost
 
-    return render_template("profile.html", user=user, devices=devices, stats=stats)
+    # --- NEW: Get dynamic data ---
+    # Alerts
+    alerts = []
+    try:
+        alerts = api_alerts().json["alerts"]
+    except Exception as e:
+        print(f"⚠️ Failed to load alerts: {e}")
+
+    # Recommendations
+    recs = []
+    try:
+        recs = api_recommendations().json["recommendations"]
+    except Exception as e:
+        print(f"⚠️ Failed to load recommendations: {e}")
+
+    # Goals
+    goals = {}
+    try:
+        goals = api_goals().json
+    except Exception as e:
+        print(f"⚠️ Failed to load goals: {e}")
+
+    return render_template(
+        "profile.html",
+        user=user,
+        devices=devices,
+        device_count=device_count,
+        usage_summary=usage_summary,
+        total_kwh=round(total_kwh, 2),
+        total_cost=round(total_cost, 2),
+        alerts=alerts,
+        recommendations=recs,
+        goals=goals
+    )
+
+
 
 
 # -----------------
@@ -392,14 +451,6 @@ def add_device():
     return redirect(url_for("main.dashboard"))
 
 
-# -----------------
-# Placeholder pages (analytics/predictions/etc.)
-# -----------------
-@bp.route("/analytics")
- 
-def analytics():
-    return render_template("analytics.html")
-
 
 
 
@@ -427,14 +478,13 @@ from app.utils.data_stream import simulate_live_stream
 def live_data():
     """
     SSE endpoint: stream household readings from the txt file using
-    the efficient chunked generator (simulate_live_stream).
+    simulate_live_stream, but also embed recommendations & alerts
+    each cycle (always guaranteed at least one).
     """
     def event_stream():
         import json
-
         file_path = "app/household_power_consumption.txt"
 
-        # stream values with a 2-second delay per reading
         for reading in simulate_live_stream(file_path, rate=2.0):
             payload = {
                 "timestamp": (
@@ -442,14 +492,43 @@ def live_data():
                     if hasattr(reading["timestamp"], "isoformat")
                     else str(reading["timestamp"])
                 ),
-                "energy_consumed": reading["power"],   # Global_active_power
+                "energy_consumed": reading["power"],
                 "voltage": reading["voltage"],
                 "intensity": reading["intensity"],
                 "sub_metering": reading["sub_metering"]
             }
+
+            try:
+                recs = api_recommendations().json.get("recommendations", [])
+                alerts = api_alerts().json.get("alerts", [])
+            except Exception as e:
+                print(f"⚠️ Failed to inject recs/alerts: {e}")
+                recs, alerts = [], []
+
+            # ✅ Ensure at least one recommendation
+            if not recs:
+                recs = [{
+                    "device_name": None,
+                    "suggestion": "💡 Keep up the good work! No changes needed."
+                }]
+
+            # ✅ Ensure at least one alert
+            if not alerts:
+                alerts = [{
+                    "device_name": None,
+                    "device_type": None,
+                    "message": "✅ No abnormal usage detected.",
+                    "timestamp":  datetime.utcnow().isoformat()
+                }]
+
+            payload["recommendations"] = recs
+            payload["alerts"] = alerts
+
             yield f"data: {json.dumps(payload)}\n\n"
 
     return Response(event_stream(), mimetype="text/event-stream")
+
+
 
 
 
@@ -822,5 +901,85 @@ def api_forecast():
 
     result = df_pred.reset_index().to_dict(orient="records")
     return jsonify(result)
+
+
+# -----------------
+# Recommendations
+# -----------------
+# ----------- RECOMMENDATIONS API -----------
+@bp.route("/api/recommendations")
+def api_recommendations():
+    recs = []
+
+    # Example: build recommendations
+    for d in Device.query.all():
+        if random.random() < 0.2:  # simulate random recommendation chance
+            recs.append({
+                "device_name": d.device_name,
+                "suggestion": f"Consider turning off {d.device_name} when not in use."
+            })
+
+    # ✅ Always return at least one suggestion
+    if not recs:
+        recs.append({
+            "device_name": None,
+            "suggestion": "💡 Keep up the good work! No changes needed."
+        })
+
+    return jsonify({"recommendations": recs})
+
+
+
+
+@bp.route("/api/alerts")
+def api_alerts():
+    alerts = []
+
+    # Example: build alerts from conditions
+    for d in Device.query.all():
+        if random.random() < 0.2:  # simulate random alert chance
+            alerts.append({
+                "device_name": d.device_name,
+                "device_type": d.device_type,
+                "message": f"High usage detected for {d.device_name}",
+                "timestamp":  datetime.utcnow().isoformat()
+            })
+
+    # ✅ Always return at least one message
+    if not alerts:
+        alerts.append({
+            "device_name": None,
+            "device_type": None,
+            "message": "✅ No abnormal usage detected.",
+            "timestamp":  datetime.utcnow().isoformat()
+        })
+
+    return jsonify({"alerts": alerts})
+
+
+
+# -----------------
+# Goals (Gamification)
+# -----------------
+@bp.route("/api/goals")
+def api_goals():
+    import random
+
+    devices = Device.query.filter_by(user_id=current_user.id).all()
+
+    total_kwh = 0
+    for d in devices:
+        total_kwh += round(random.uniform(0.1, 2.0), 2)
+
+    daily_goal = 20  # kWh (could be user-configurable later)
+
+    return jsonify({
+        "goal": daily_goal,
+        "current_usage": round(total_kwh, 2),
+        "progress": round((total_kwh / daily_goal) * 100, 1),
+        "status": "On Track" if total_kwh <= daily_goal else "Exceeded"
+    })
+
+
 
 

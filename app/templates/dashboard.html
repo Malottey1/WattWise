@@ -1,80 +1,183 @@
 {% extends "base.html" %}
 {% block content %}
-<h2 class="mb-4">Your Dashboard</h2>
-
-<div class="row">
-  <div class="col-md-4">
-    <div class="card shadow-sm mb-3">
-      <div class="card-body">
-        <h5 class="card-title">Latest Reading</h5>
-        {% if latest %}
-          <p><strong>Device:</strong> {{ latest.device.device_name if latest.device else ("Device #" ~ latest.device_id) }}</p>
-          <p><strong>Energy (kW):</strong> <span id="latest-energy">{{ latest.energy_consumed }}</span> kW</p>
-          <p><strong>Voltage:</strong> {{ latest.voltage or "N/A" }}</p>
-          <p><strong>Time:</strong> {{ latest.timestamp.strftime("%Y-%m-%d %H:%M") }}</p>
-        {% else %}
-          <p>No readings yet.</p>
-        {% endif %}
-      </div>
-    </div>
+<div class="dashboard-container">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="page-title">Your Dashboard</h2>
+    <div class="current-time text-muted small" id="current-time"></div>
   </div>
 
-  <div class="col-md-8">
-    <div class="card shadow-sm mb-3">
-      <div class="card-body">
-        <h5 class="card-title">Live Summary</h5>
-        <div class="d-flex justify-content-between">
-          <div>
-            <p>Total Live Cost: <strong id="live-cost">{{ "%.3f"|format(total_cost) }}</strong></p>
-            <p>Total Carbon (kg CO₂): <strong id="live-carbon">{{ "%.3f"|format(total_carbon) }}</strong></p>
-            <p>Active Devices: <strong id="active-devices">{{ active_devices }}</strong></p>
-          </div>
-          <div style="width:220px;">
-            <h6 class="text-center">Usage Gauge</h6>
-            <div class="progress" style="height:28px;">
-              <div id="usage-gauge" class="progress-bar" role="progressbar" style="width: {{ usage_percent }}%">{{ usage_percent }}%</div>
+  <!-- Summary Cards -->
+  <div class="row g-4 mb-4">
+    <!-- Latest Reading Card -->
+    <div class="col-md-4">
+      <div class="card summary-card">
+        <div class="card-header">
+          <i class="fas fa-bolt card-icon"></i>
+          <h5 class="card-title">Latest Reading</h5>
+        </div>
+        <div class="card-body">
+          {% if latest %}
+            <div class="metric-item">
+              <span class="metric-label">Device</span>
+              <span class="metric-value">{{ latest.device.device_name if latest.device else ("Device #" ~ latest.device_id) }}</span>
             </div>
-            <p class="small text-muted mt-2">Color: green=normal, yellow=high, red=very high</p>
+            <div class="metric-item">
+              <span class="metric-label">Energy Consumption</span>
+              <span class="metric-value highlight" id="latest-energy">{{ latest.energy_consumed }} kW</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Voltage</span>
+              <span class="metric-value">{{ latest.voltage or "N/A" }}</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Time Recorded</span>
+              <span class="metric-value">{{ latest.timestamp.strftime("%Y-%m-%d %H:%M") }}</span>
+            </div>
+          {% else %}
+            <div class="no-data">
+              <i class="fas fa-chart-line no-data-icon"></i>
+              <p>No readings available</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Summary Card -->
+    <div class="col-md-8">
+      <div class="card summary-card">
+        <div class="card-header">
+          <i class="fas fa-chart-line card-icon"></i>
+          <h5 class="card-title">Live Summary</h5>
+        </div>
+        <div class="card-body">
+          <div class="row g-4">
+            <div class="col-md-6">
+              <div class="metric-grid">
+                <div class="metric-card">
+                  <div class="metric-value-lg" id="live-cost">{{ "%.3f"|format(total_cost) }}</div>
+                  <div class="metric-label">Total Cost</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-value-lg" id="live-carbon">{{ "%.3f"|format(total_carbon) }}</div>
+                  <div class="metric-label">Carbon (kg CO₂)</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-value-lg" id="active-devices">{{ active_devices }}</div>
+                  <div class="metric-label">Active Devices</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="usage-gauge-container">
+                <h6 class="gauge-title">Usage Efficiency</h6>
+                <div class="gauge-wrapper">
+                  <div class="gauge-background">
+                    <div id="usage-gauge" class="gauge-fill" style="width: {{ usage_percent }}%"></div>
+                  </div>
+                  <div class="gauge-value">{{ usage_percent }}%</div>
+                </div>
+                <div class="gauge-labels">
+                  <span class="gauge-label">Optimal</span>
+                  <span class="gauge-label">High</span>
+                  <span class="gauge-label">Critical</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 
-<!-- Devices list -->
-<div class="card shadow-sm mt-2">
-  <div class="card-body">
-    <div class="d-flex justify-content-between align-items-center">
-      <h5 class="card-title">Connected Devices</h5>
-      <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addDeviceModal">➕ Connect Device</button>
+  <!-- Devices Section -->
+  <div class="card devices-card">
+    <div class="card-header">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <i class="fas fa-plug card-icon"></i>
+          <h5 class="card-title">Connected Devices</h5>
+        </div>
+        <button class="btn btn-primary btn-add" data-bs-toggle="modal" data-bs-target="#addDeviceModal">
+          <i class="fas fa-plus"></i>
+          Connect Device
+        </button>
+      </div>
     </div>
+    <div class="card-body">
+      {% if devices %}
+        <div class="table-responsive">
+          <table class="table devices-table">
+            <thead>
+              <tr>
+                <th>Device</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Last Reading</th>
+                <th>Cost</th>
+                <th>Carbon</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="deviceTable">
+              {% for d in devices %}
+              <tr data-device-id="{{ d.id }}">
+                <td class="device-name">{{ d.device_name }}</td>
+                <td class="device-type">{{ d.device_type }}</td>
+                <td>
+                  <span class="status-badge status-connected">
+                    <i class="fas fa-circle status-icon"></i>
+                    Connected
+                  </span>
+                </td>
+                <td id="reading-{{ d.id }}" class="reading-value">--</td>
+                <td id="cost-{{ d.id }}" class="cost-value">--</td>
+                <td id="carbon-{{ d.id }}" class="carbon-value">--</td>
+                <td class="action-buttons">
+                  <button class="btn btn-sm btn-simulate start-sim" data-device-id="{{ d.id }}">
+                    <i class="fas fa-play"></i>
+                    Start
+                  </button>
+                  <button class="btn btn-sm btn-stop stop-sim" data-device-id="{{ d.id }}">
+                    <i class="fas fa-stop"></i>
+                    Stop
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="no-devices text-center py-5">
+          <i class="fas fa-plug-slash no-data-icon"></i>
+          <h6 class="mt-3">No devices connected</h6>
+          <p class="text-muted">Get started by connecting your first device</p>
+          <button class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#addDeviceModal">
+            Connect Device
+          </button>
+        </div>
+      {% endif %}
+    </div>
+  </div>
 
-    {% if devices %}
-      <table class="table mt-3">
-        <thead>
-          <tr><th>Device</th><th>Type</th><th>Status</th><th>Last Reading</th><th>Cost</th><th>Carbon (kg)</th><th>Sim</th></tr>
-        </thead>
-        <tbody id="deviceTable">
-          {% for d in devices %}
-          <tr data-device-id="{{ d.id }}">
-            <td>{{ d.device_name }}</td>
-            <td>{{ d.device_type }}</td>
-            <td><span class="badge bg-success">Connected</span></td>
-            <td id="reading-{{ d.id }}">--</td>
-            <td id="cost-{{ d.id }}">--</td>
-            <td id="carbon-{{ d.id }}">--</td>
-            <td>
-              <button class="btn btn-sm btn-outline-success start-sim" data-device-id="{{ d.id }}">Start</button>
-              <button class="btn btn-sm btn-outline-danger stop-sim" data-device-id="{{ d.id }}">Stop</button>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% else %}
-      <p class="text-muted mt-3">No devices connected yet.</p>
-    {% endif %}
+  <!-- Chart Section -->
+  <div class="card chart-card mt-4">
+    <div class="card-header">
+      <i class="fas fa-chart-area card-icon"></i>
+      <h5 class="card-title">Energy Usage Trends</h5>
+      <div class="chart-legend">
+        <div class="legend-item">
+          <div class="legend-color energy-color"></div>
+          <span>Energy Consumption (kW)</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="chart-container">
+        <canvas id="energyChart"></canvas>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -83,13 +186,13 @@
   <div class="modal-dialog">
     <form method="POST" action="{{ url_for('main.add_device') }}" class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Connect Device</h5>
+        <h5 class="modal-title">Connect New Device</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <div class="mb-3">
           <label class="form-label">Device Name</label>
-          <input type="text" class="form-control" name="device_name" placeholder="Smart Meter" required>
+          <input type="text" class="form-control" name="device_name" placeholder="e.g., Living Room Smart Meter" required>
         </div>
         <div class="mb-3">
           <label class="form-label">Device Type</label>
@@ -103,29 +206,30 @@
         </div>
         <div class="form-check form-switch">
           <input class="form-check-input" type="checkbox" name="simulate" id="simulateSwitch">
-          <label class="form-check-label" for="simulateSwitch">Simulate Data</label>
+          <label class="form-check-label" for="simulateSwitch">Enable Data Simulation</label>
         </div>
       </div>
       <div class="modal-footer">
-        <button type="submit" class="btn btn-success">Add Device</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Device</button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- Chart area -->
-<div class="card shadow-sm mt-4">
-  <div class="card-body">
-    <h5 class="card-title">Energy Usage Trends (Most recent readings)</h5>
-    <canvas id="energyChart" height="120"></canvas>
-  </div>
-</div>
-
-
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  // ---- INITIAL CHART (from historical txt file) ----
+  // Update current time
+  function updateCurrentTime() {
+    const now = new Date();
+    document.getElementById('current-time').textContent = 
+      `Last updated: ${now.toLocaleTimeString()}`;
+  }
+  setInterval(updateCurrentTime, 1000);
+  updateCurrentTime();
+
+  // Initialize Chart with Clean Design
   const initialLabels = {{ readings | map(attribute='timestamp') | list | tojson }};
   const initialEnergyData = {{ readings | map(attribute='energy_consumed') | list | tojson }};
 
@@ -136,27 +240,80 @@
       labels: initialLabels,
       datasets: [
         { 
-          label: 'Energy (kW)', 
+          label: 'Energy Consumption', 
           data: initialEnergyData, 
-          borderWidth: 2, 
-          fill: true, 
-          tension: 0.3,
-          borderColor: 'rgb(75, 192, 192)',
-          backgroundColor: 'rgba(75, 192, 192, 0.1)'
+          borderWidth: 2,
+          borderColor: 'rgba(74, 222, 128, 1)',
+          backgroundColor: 'rgba(74, 222, 128, 0.1)',
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: 'rgba(74, 222, 128, 1)',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2,
+          pointRadius: 3,
+          pointHoverRadius: 6
         }
       ]
     },
     options: { 
-      responsive: true, 
-      animation: false, // disable animations for low CPU
-      plugins: { legend: { position: 'top' } },
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {
+        duration: 0
+      },
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          titleColor: '#ffffff',
+          bodyColor: '#ffffff',
+          borderColor: 'rgba(74, 222, 128, 1)',
+          borderWidth: 1
+        }
+      },
       scales: {
         y: {
           beginAtZero: true,
-          title: { display: true, text: 'Energy (kW)' }
+          grid: {
+            color: 'rgba(0, 0, 0, 0.1)',
+            drawBorder: false
+          },
+          ticks: {
+            color: 'rgba(0, 0, 0, 0.6)'
+          },
+          title: {
+            display: true,
+            text: 'Energy (kW)',
+            color: 'rgba(0, 0, 0, 0.7)'
+          }
         },
         x: {
-          title: { display: true, text: 'Time' }
+          grid: {
+            display: false
+          },
+          ticks: {
+            color: 'rgba(0, 0, 0, 0.6)',
+            maxRotation: 0
+          },
+          title: {
+            display: true,
+            text: 'Time',
+            color: 'rgba(0, 0, 0, 0.7)'
+          }
+        }
+      },
+      interaction: {
+        mode: 'nearest',
+        axis: 'x',
+        intersect: false
+      },
+      elements: {
+        line: {
+          tension: 0.4
         }
       }
     }
@@ -170,23 +327,23 @@
       const data = JSON.parse(event.data);
       const label = new Date(data.timestamp).toLocaleTimeString();
 
-      // --- update chart ---
+      // Update chart
       energyChart.data.labels.push(label);
       energyChart.data.datasets[0].data.push(data.energy_consumed);
-      if (energyChart.data.labels.length > 100) {
+      
+      // Keep only last 50 data points for cleaner view
+      if (energyChart.data.labels.length > 50) {
         energyChart.data.labels.shift();
         energyChart.data.datasets[0].data.shift();
       }
+      
       energyChart.update("none");
+      updateCurrentTime();
 
-      // --- update "Latest Reading" card instantly ---
+      // Update latest reading
       const latestEnergy = document.getElementById("latest-energy");
       if (latestEnergy) {
-        latestEnergy.innerText = data.energy_consumed.toFixed(3);
-      }
-      const latestTime = document.getElementById("latest-time");
-      if (latestTime) {
-        latestTime.innerText = new Date(data.timestamp).toLocaleString();
+        latestEnergy.textContent = data.energy_consumed.toFixed(3) + " kW";
       }
 
     } catch (err) {
@@ -194,7 +351,7 @@
     }
   };
 
-  // ---- POLL METRICS (summary totals, devices, costs, carbon) ----
+  // ---- POLL METRICS ----
   async function fetchLatestMetrics(){
     try {
       const resp = await fetch('/api/latest_metrics');
@@ -208,9 +365,9 @@
         const cid = document.getElementById('cost-' + dev.device_id);
         const carb = document.getElementById('carbon-' + dev.device_id);
         
-        if (rid) rid.innerText = dev.last_reading !== null ? dev.last_reading + ' kW' : '--';
-        if (cid) cid.innerText = dev.cost ? dev.cost.toFixed(3) : '--';
-        if (carb) carb.innerText = dev.carbon_kg ? dev.carbon_kg.toFixed(3) : '--';
+        if (rid) rid.textContent = dev.last_reading !== null ? dev.last_reading + ' kW' : '--';
+        if (cid) cid.textContent = dev.cost ? dev.cost.toFixed(3) : '--';
+        if (carb) carb.textContent = dev.carbon_kg ? dev.carbon_kg.toFixed(3) : '--';
         
         if (dev.last_reading !== null) {
           activeCount++;
@@ -220,33 +377,36 @@
         }
       });
 
-      document.getElementById('live-cost').innerText = totalCost.toFixed(3);
-      document.getElementById('live-carbon').innerText = totalCarbon.toFixed(3);
-      document.getElementById('active-devices').innerText = activeCount;
+      document.getElementById('live-cost').textContent = totalCost.toFixed(3);
+      document.getElementById('live-carbon').textContent = totalCarbon.toFixed(3);
+      document.getElementById('active-devices').textContent = activeCount;
 
-      // usage gauge percent
+      // Update usage gauge
       const maxExpected = 5.0 * (activeCount || 1);
       const percent = Math.min(100, Math.round((usageSum / (maxExpected || 1)) * 100));
       const gauge = document.getElementById('usage-gauge');
       gauge.style.width = percent + '%';
-      gauge.innerText = percent + '%';
-      gauge.classList.remove('bg-success','bg-warning','bg-danger');
-      if (percent < 50) gauge.classList.add('bg-success');
-      else if (percent < 80) gauge.classList.add('bg-warning');
-      else gauge.classList.add('bg-danger');
+      gauge.parentNode.querySelector('.gauge-value').textContent = percent + '%';
+      
+      // Update gauge color
+      gauge.className = 'gauge-fill';
+      if (percent < 50) gauge.classList.add('gauge-optimal');
+      else if (percent < 80) gauge.classList.add('gauge-high');
+      else gauge.classList.add('gauge-critical');
+
     } catch (err) {
       console.error('fetchLatestMetrics error', err);
     }
   }
 
-  // Poll metrics every 20s (less frequent than before)
+  // Poll metrics every 20s
   setInterval(fetchLatestMetrics, 20000);
   fetchLatestMetrics();
 
   // ---- SIMULATION BUTTONS ----
   document.querySelectorAll('.start-sim').forEach(btn => {
     btn.addEventListener('click', async (e) => {
-      const id = e.target.dataset.deviceId;
+      const id = e.target.closest('.btn-simulate').dataset.deviceId;
       try {
         const response = await fetch('/api/start_simulation', {
           method: 'POST',
@@ -257,10 +417,10 @@
         if (response.ok) {
           btn.disabled = true;
           const row = btn.closest('tr');
-          const statusBadge = row.querySelector('.badge');
+          const statusBadge = row.querySelector('.status-badge');
           if (statusBadge) {
-            statusBadge.className = 'badge bg-warning';
-            statusBadge.textContent = 'Simulating';
+            statusBadge.className = 'status-badge status-simulating';
+            statusBadge.innerHTML = '<i class="fas fa-circle status-icon"></i>Simulating';
           }
         }
       } catch (err) {
@@ -271,7 +431,7 @@
   
   document.querySelectorAll('.stop-sim').forEach(btn => {
     btn.addEventListener('click', async (e) => {
-      const id = e.target.dataset.deviceId;
+      const id = e.target.closest('.btn-stop').dataset.deviceId;
       try {
         const response = await fetch('/api/stop_simulation', {
           method: 'POST',
@@ -283,10 +443,10 @@
           const startBtn = document.querySelector('.start-sim[data-device-id="' + id + '"]');
           if (startBtn) startBtn.disabled = false;
           const row = btn.closest('tr');
-          const statusBadge = row.querySelector('.badge');
+          const statusBadge = row.querySelector('.status-badge');
           if (statusBadge) {
-            statusBadge.className = 'badge bg-success';
-            statusBadge.textContent = 'Connected';
+            statusBadge.className = 'status-badge status-connected';
+            statusBadge.innerHTML = '<i class="fas fa-circle status-icon"></i>Connected';
           }
         }
       } catch (err) {
@@ -296,4 +456,349 @@
   });
 </script>
 
+<style>
+  .dashboard-container {
+    padding: 0 10px;
+  }
+
+  .page-title {
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0;
+  }
+
+  .current-time {
+    font-size: 0.875rem;
+  }
+
+  /* Card Styles */
+  .summary-card, .devices-card, .chart-card {
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    background: #ffffff;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .summary-card:hover, .devices-card:hover, .chart-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  }
+
+  .card-header {
+    background: transparent;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    padding: 20px 24px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .card-icon {
+    color: #4ade80;
+    font-size: 1.25rem;
+  }
+
+  .card-title {
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+    font-size: 1.1rem;
+    margin-right: 900px;
+  }
+
+  .card-body {
+    padding: 24px;
+  }
+
+  /* Metric Styles */
+  .metric-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .metric-item:last-child {
+    border-bottom: none;
+  }
+
+  .metric-label {
+    color: #666;
+    font-size: 0.9rem;
+  }
+
+  .metric-value {
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+
+  .metric-value.highlight {
+    color: #4ade80;
+    font-size: 1.1rem;
+  }
+
+  .metric-grid {
+    display: grid;
+    gap: 16px;
+  }
+
+  .metric-card {
+    text-align: center;
+    padding: 20px;
+    background: rgba(74, 222, 128, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(74, 222, 128, 0.1);
+  }
+
+  .metric-value-lg {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #4ade80;
+    line-height: 1;
+  }
+
+  /* Usage Gauge */
+  .usage-gauge-container {
+    text-align: center;
+  }
+
+  .gauge-title {
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: #1a1a1a;
+  }
+
+  .gauge-wrapper {
+    position: relative;
+    margin: 0 auto 12px;
+    max-width: 200px;
+  }
+
+  .gauge-background {
+    height: 24px;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .gauge-fill {
+    height: 100%;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+  }
+
+  .gauge-optimal {
+    background: linear-gradient(90deg, #4ade80, #22c55e);
+  }
+
+  .gauge-high {
+    background: linear-gradient(90deg, #f59e0b, #eab308);
+  }
+
+  .gauge-critical {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+  }
+
+  .gauge-value {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-weight: 700;
+    color: #1a1a1a;
+    font-size: 0.875rem;
+  }
+
+  .gauge-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #666;
+  }
+
+  /* Table Styles */
+  .devices-table {
+    margin: 0;
+  }
+
+  .devices-table th {
+    background: rgba(0, 0, 0, 0.02);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    font-weight: 600;
+    color: #666;
+    padding: 16px 12px;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .devices-table td {
+    padding: 16px 12px;
+    vertical-align: middle;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .device-name {
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+
+  .device-type {
+    color: #666;
+  }
+
+  /* Status Badges */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  .status-connected {
+    background: rgba(74, 222, 128, 0.1);
+    color: #16a34a;
+  }
+
+  .status-simulating {
+    background: rgba(245, 158, 11, 0.1);
+    color: #d97706;
+  }
+
+  .status-icon {
+    font-size: 0.5rem;
+  }
+
+  /* Action Buttons */
+  .btn-add {
+    background: #4ade80;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 10px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+  }
+
+  .btn-add:hover {
+    background: #22c55e;
+    transform: translateY(-1px);
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn-simulate, .btn-stop {
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease;
+  }
+
+  .btn-simulate {
+    background: rgba(74, 222, 128, 0.1);
+    color: #16a34a;
+    border: 1px solid rgba(74, 222, 128, 0.2);
+  }
+
+  .btn-simulate:hover {
+    background: #4ade80;
+    color: white;
+  }
+
+  .btn-stop {
+    background: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+  }
+
+  .btn-stop:hover {
+    background: #ef4444;
+    color: white;
+  }
+
+  /* Chart Styles */
+  .chart-legend {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    color: #666;
+  }
+
+  .legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+  }
+
+  .energy-color {
+    background: #4ade80;
+  }
+
+  .chart-container {
+    height: 300px;
+    position: relative;
+  }
+
+  /* No Data States */
+  .no-data, .no-devices {
+    text-align: center;
+    color: #666;
+  }
+
+  .no-data-icon {
+    font-size: 3rem;
+    color: rgba(0, 0, 0, 0.1);
+    margin-bottom: 16px;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .dashboard-container {
+      padding: 0 5px;
+    }
+    
+    .card-header {
+      padding: 16px 20px 12px;
+    }
+    
+    .card-body {
+      padding: 20px;
+    }
+    
+    .metric-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .action-buttons {
+      flex-direction: column;
+    }
+    
+    .chart-legend {
+      margin-left: 0;
+      margin-top: 12px;
+      justify-content: center;
+    }
+  }
+</style>
 {% endblock %}

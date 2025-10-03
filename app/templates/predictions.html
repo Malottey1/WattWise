@@ -1,79 +1,143 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container">
-  <h1 class="text-center mb-4">🤖 AI Prediction Hub</h1>
-  <p class="lead text-center">
-    24-hour energy consumption forecast powered by LSTM neural networks
-  </p>
+<div class="prediction-container">
+  <div class="prediction-header text-center mb-5">
+    <h1 class="page-title">AI Prediction Hub</h1>
+    <p class="page-subtitle">
+      24-hour energy consumption forecast powered by LSTM neural networks
+    </p>
+  </div>
 
   <!-- Forecast Controls -->
-  <div class="card mb-4">
-    <div class="card-header bg-primary text-white">Forecast Controls</div>
+  <div class="card control-card mb-4">
+    <div class="card-header">
+      <i class="fas fa-sliders-h card-icon"></i>
+      <h5 class="card-title">Forecast Controls</h5>
+    </div>
     <div class="card-body">
-      <form id="forecast-form" class="row g-3">
+      <form id="forecast-form" class="row g-4">
         <div class="col-md-4">
-          <label for="adjustment" class="form-label">Adjustment Factor</label>
-          <select class="form-select" id="adjustment">
-            <option value="-30">-30%</option>
-            <option value="0" selected>0%</option>
-            <option value="30">+30%</option>
-          </select>
+          <div class="form-group">
+            <label for="adjustment" class="form-label">Adjustment Factor</label>
+            <select class="form-select custom-select" id="adjustment">
+              <option value="-30">-30% (Reduced Usage)</option>
+              <option value="0" selected>0% (Current Pattern)</option>
+              <option value="30">+30% (Increased Usage)</option>
+            </select>
+          </div>
         </div>
         <div class="col-md-4">
-          <label for="horizon" class="form-label">Forecast Horizon (hours)</label>
-          <input type="number" id="horizon" class="form-control" value="24" min="1" max="72">
+          <div class="form-group">
+            <label for="horizon" class="form-label">Forecast Horizon</label>
+            <div class="input-with-unit">
+              <input type="number" id="horizon" class="form-control custom-input" value="24" min="1" max="72">
+              <span class="input-unit">hours</span>
+            </div>
+          </div>
         </div>
         <div class="col-md-4 d-flex align-items-end">
-          <button type="submit" class="btn btn-success w-100">Generate Forecast</button>
+          <button type="submit" class="btn btn-primary btn-generate w-100">
+            <i class="fas fa-bolt me-2"></i>
+            Generate Forecast
+          </button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Model Info -->
-  <div class="card mb-4">
-    <div class="card-header bg-info text-white">Model Information</div>
-    <div class="card-body">
-      <p><strong>Type:</strong> LSTM Sequence-to-Sequence</p>
-      <p><strong>Horizon:</strong> 24 hours</p>
-      <p><strong>Update:</strong> Real-time</p>
+  <div class="row g-4 mb-4">
+    <!-- Model Info -->
+    <div class="col-md-4">
+      <div class="card info-card">
+        <div class="card-header">
+          <i class="fas fa-brain card-icon"></i>
+          <h5 class="card-title">Model Information</h5>
+        </div>
+        <div class="card-body">
+          <div class="info-item">
+            <div class="info-label">Type</div>
+            <div class="info-value">LSTM Sequence-to-Sequence</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Horizon</div>
+            <div class="info-value">24 hours</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Update Frequency</div>
+            <div class="info-value">Real-time</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Peak Usage Analysis -->
+    <div class="col-md-8">
+      <div class="card analysis-card">
+        <div class="card-header">
+          <i class="fas fa-chart-line card-icon"></i>
+          <h5 class="card-title">Peak Usage Analysis</h5>
+        </div>
+        <div class="card-body" id="peak-usage">
+          <div class="no-forecast">
+            <i class="fas fa-chart-bar no-data-icon"></i>
+            <p>Generate a forecast to see peak usage analysis</p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- Forecast Graph -->
-  <div class="card mb-4">
-    <div class="card-header bg-dark text-white">24-Hour Energy Forecast</div>
-    <div class="card-body">
-      <canvas id="forecastChart" height="120"></canvas>
+  <div class="card chart-card mb-4">
+    <div class="card-header">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <i class="fas fa-chart-area card-icon"></i>
+          <h5 class="card-title">24-Hour Energy Forecast</h5>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item">
+            <div class="legend-color forecast-color"></div>
+            <span>Predicted Energy (kW)</span>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
-
-  <!-- Peak Usage Analysis -->
-  <div class="card mb-4">
-    <div class="card-header bg-warning text-dark">Peak Usage Analysis</div>
-    <div class="card-body" id="peak-usage">
-      <p>No forecast generated yet.</p>
+    <div class="card-body">
+      <div class="chart-container">
+        <canvas id="forecastChart"></canvas>
+      </div>
     </div>
   </div>
 
   <!-- Hourly Breakdown -->
-  <div class="card mb-4">
-    <div class="card-header bg-secondary text-white">Hourly Breakdown</div>
+  <div class="card table-card">
+    <div class="card-header">
+      <i class="fas fa-table card-icon"></i>
+      <h5 class="card-title">Hourly Breakdown</h5>
+    </div>
     <div class="card-body">
       <div class="table-responsive">
-        <table class="table table-striped" id="forecastTable">
+        <table class="table forecast-table" id="forecastTable">
           <thead>
             <tr>
               <th>Time</th>
               <th>Predicted (kW)</th>
-              <th>Estimated Cost ($)</th>
+              <th>Estimated Cost</th>
               <th>Status</th>
               <th>Recommendation</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td colspan="5" class="text-center">Generate a forecast to see hourly predictions</td></tr>
+            <tr>
+              <td colspan="5" class="text-center py-5">
+                <div class="no-forecast">
+                  <i class="fas fa-calculator no-data-icon"></i>
+                  <p>Generate a forecast to see hourly predictions</p>
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -81,82 +145,577 @@
   </div>
 </div>
 
-<!-- Chart.js & Custom Script -->
-<!-- Chart.js & Custom Script -->
-<!-- ✅ Load Chart.js before using it -->
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 document.getElementById('forecast-form').addEventListener('submit', async function(e) {
   e.preventDefault();
+  
   const adjustment = document.getElementById('adjustment').value;
   const horizon = document.getElementById('horizon').value;
+  
+  // Show loading state
+  const generateBtn = document.querySelector('.btn-generate');
+  const originalText = generateBtn.innerHTML;
+  generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating...';
+  generateBtn.disabled = true;
 
-  const res = await fetch(`/api/forecast?adjustment=${adjustment}&horizon=${horizon}`);
-  const data = await res.json();
+  try {
+    const res = await fetch(`/api/forecast?adjustment=${adjustment}&horizon=${horizon}`);
+    const data = await res.json();
 
-  console.log("Forecast API Data:", data);
+    console.log("Forecast API Data:", data);
 
-  // Update Chart
-  const ctx = document.getElementById('forecastChart').getContext('2d');
+    // Update Chart
+    const ctx = document.getElementById('forecastChart').getContext('2d');
 
-  // ✅ Safely destroy previous chart if it exists
-  const existingChart = Chart.getChart(ctx.canvas);
-  if (existingChart) {
-    existingChart.destroy();
-  }
+    // Safely destroy previous chart if it exists
+    const existingChart = Chart.getChart(ctx.canvas);
+    if (existingChart) {
+      existingChart.destroy();
+    }
 
-  window.forecastChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: data.map(d => new Date(d.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})),
-      datasets: [{
-        label: 'Predicted kW',
-        data: data.map(d => d.predicted),
-        borderColor: 'rgba(75, 192, 192, 1)',
-        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-        fill: true,
-        tension: 0.2,
-        pointRadius: 2
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: true } },
-      scales: {
-        y: {
-          beginAtZero: true,
-          title: { display: true, text: "kW" }
+    window.forecastChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.map(d => new Date(d.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})),
+        datasets: [{
+          label: 'Predicted Energy Consumption',
+          data: data.map(d => d.predicted),
+          borderColor: 'rgba(139, 69, 255, 1)',
+          backgroundColor: 'rgba(139, 69, 255, 0.1)',
+          fill: true,
+          tension: 0.4,
+          borderWidth: 3,
+          pointBackgroundColor: 'rgba(139, 69, 255, 1)',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 7
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            titleColor: '#ffffff',
+            bodyColor: '#ffffff',
+            borderColor: 'rgba(139, 69, 255, 1)',
+            borderWidth: 1,
+            callbacks: {
+              label: function(context) {
+                return `Predicted: ${context.parsed.y.toFixed(2)} kW`;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: 'rgba(0, 0, 0, 0.1)',
+              drawBorder: false
+            },
+            ticks: {
+              color: 'rgba(0, 0, 0, 0.6)'
+            },
+            title: {
+              display: true,
+              text: 'Energy (kW)',
+              color: 'rgba(0, 0, 0, 0.7)'
+            }
+          },
+          x: {
+            grid: {
+              display: false
+            },
+            ticks: {
+              color: 'rgba(0, 0, 0, 0.6)',
+              maxRotation: 0
+            },
+            title: {
+              display: true,
+              text: 'Time',
+              color: 'rgba(0, 0, 0, 0.7)'
+            }
+          }
+        },
+        interaction: {
+          mode: 'nearest',
+          axis: 'x',
+          intersect: false
         }
       }
-    }
-  });
+    });
 
-  // Update Table
-  const tbody = document.querySelector('#forecastTable tbody');
-  tbody.innerHTML = '';
-  data.forEach(row => {
-    tbody.innerHTML += `
-      <tr>
-        <td>${new Date(row.timestamp).toLocaleString()}</td>
-        <td>${row.predicted.toFixed(2)}</td>
-        <td>${row.estimated_cost ? row.estimated_cost.toFixed(2) : "-"}</td>
-        <td>${row.status || "-"}</td>
-        <td>${row.recommendation || "-"}</td>
-      </tr>
+    // Update Table
+    const tbody = document.querySelector('#forecastTable tbody');
+    tbody.innerHTML = '';
+    
+    data.forEach((row, index) => {
+      const time = new Date(row.timestamp);
+      const isPeakHour = index === data.reduce((maxIndex, currentRow, currentIndex, arr) => 
+        currentRow.predicted > arr[maxIndex].predicted ? currentIndex : maxIndex, 0);
+      
+      const statusClass = isPeakHour ? 'status-peak' : 
+                         row.predicted > 2.5 ? 'status-high' : 
+                         row.predicted > 1.5 ? 'status-medium' : 'status-low';
+      
+      const statusText = isPeakHour ? 'Peak' :
+                        row.predicted > 2.5 ? 'High' :
+                        row.predicted > 1.5 ? 'Medium' : 'Low';
+      
+      const recommendation = isPeakHour ? 'Consider reducing usage' :
+                            row.predicted > 2.5 ? 'Monitor closely' :
+                            row.predicted > 1.5 ? 'Normal operation' : 'Efficient usage';
+
+      tbody.innerHTML += `
+        <tr class="${isPeakHour ? 'peak-row' : ''}">
+          <td class="time-cell">
+            <div class="time-primary">${time.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', hour12: true})}</div>
+          </td>
+          <td class="prediction-cell">
+            <span class="prediction-value">${row.predicted.toFixed(2)}</span>
+            <span class="prediction-unit">kW</span>
+          </td>
+          <td class="cost-cell">
+            $${row.estimated_cost ? row.estimated_cost.toFixed(2) : "0.00"}
+          </td>
+          <td class="status-cell">
+            <span class="status-badge ${statusClass}">${statusText}</span>
+          </td>
+          <td class="recommendation-cell">
+            ${recommendation}
+          </td>
+        </tr>
+      `;
+    });
+
+    // Update Peak Usage
+    const max = data.reduce((a, b) => a.predicted > b.predicted ? a : b);
+    const peakTime = new Date(max.timestamp);
+    
+    document.getElementById('peak-usage').innerHTML = `
+      <div class="peak-analysis">
+        <div class="peak-metric">
+          <div class="peak-label">Peak Hour</div>
+          <div class="peak-value">${peakTime.toLocaleString()}</div>
+        </div>
+        <div class="peak-metric">
+          <div class="peak-label">Predicted Usage</div>
+          <div class="peak-value highlight">${max.predicted.toFixed(2)} kW</div>
+        </div>
+        <div class="peak-metric">
+          <div class="peak-label">Estimated Cost</div>
+          <div class="peak-value">$${max.estimated_cost ? max.estimated_cost.toFixed(2) : "0.00"}</div>
+        </div>
+        <div class="peak-recommendation">
+          <i class="fas fa-lightbulb recommendation-icon"></i>
+          <div>
+            <div class="recommendation-title">Recommendation</div>
+            <div class="recommendation-text">Consider shifting high-energy activities to off-peak hours to reduce costs</div>
+          </div>
+        </div>
+      </div>
     `;
-  });
 
-  // Update Peak Usage
-  const max = data.reduce((a, b) => a.predicted > b.predicted ? a : b);
-  document.getElementById('peak-usage').innerHTML = `
-    <p><strong>Peak Hour:</strong> ${new Date(max.timestamp).toLocaleString()}</p>
-    <p><strong>Predicted Usage:</strong> ${max.predicted.toFixed(2)} kW</p>
-    <p><strong>Recommendation:</strong> ${max.recommendation || "-"}</p>
-  `;
+  } catch (error) {
+    console.error('Error generating forecast:', error);
+    alert('Error generating forecast. Please try again.');
+  } finally {
+    // Reset button state
+    generateBtn.innerHTML = originalText;
+    generateBtn.disabled = false;
+  }
 });
 </script>
 
+<style>
+.prediction-container {
+  padding: 0 10px;
+}
 
+.prediction-header {
+  padding: 20px 0;
+}
 
+.page-title {
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 8px;
+}
+
+.page-subtitle {
+  color: #666;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+/* Card Styles */
+.control-card, .info-card, .analysis-card, .chart-card, .table-card {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.control-card:hover, .info-card:hover, .analysis-card:hover, .chart-card:hover, .table-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.card-header {
+  background: transparent;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 20px 24px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.card-icon {
+  color: #8b45ff;
+  font-size: 1.25rem;
+}
+
+.card-title {
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.card-body {
+  padding: 24px;
+}
+
+/* Form Styles */
+.form-group {
+  margin-bottom: 0;
+}
+
+.form-label {
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.custom-select, .custom-input {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.custom-select:focus, .custom-input:focus {
+  border-color: #8b45ff;
+  box-shadow: 0 0 0 3px rgba(139, 69, 255, 0.1);
+}
+
+.input-with-unit {
+  position: relative;
+}
+
+.input-unit {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #666;
+  font-size: 0.9rem;
+}
+
+/* Button Styles */
+.btn-generate {
+  background: #8b45ff;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 24px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-generate:hover:not(:disabled) {
+  background: #7a35ee;
+  transform: translateY(-1px);
+}
+
+.btn-generate:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Info Card Styles */
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.info-item:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.info-value {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+/* Peak Analysis Styles */
+.peak-analysis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.peak-metric {
+  text-align: center;
+  padding: 16px;
+  background: rgba(139, 69, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(139, 69, 255, 0.1);
+}
+
+.peak-label {
+  font-size: 0.875rem;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.peak-value {
+  font-weight: 600;
+  color: #1a1a1a;
+  font-size: 1.1rem;
+}
+
+.peak-value.highlight {
+  color: #8b45ff;
+  font-size: 1.3rem;
+}
+
+.peak-recommendation {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255, 193, 7, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+.recommendation-icon {
+  color: #ffc107;
+  font-size: 1.5rem;
+  margin-top: 2px;
+}
+
+.recommendation-title {
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 4px;
+}
+
+.recommendation-text {
+  color: #666;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+/* Chart Styles */
+.chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.forecast-color {
+  background: #8b45ff;
+}
+
+.chart-container {
+  height: 300px;
+  position: relative;
+}
+
+/* Table Styles */
+.forecast-table {
+  margin: 0;
+}
+
+.forecast-table th {
+  background: rgba(0, 0, 0, 0.02);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  font-weight: 600;
+  color: #666;
+  padding: 16px 12px;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.forecast-table td {
+  padding: 16px 12px;
+  vertical-align: middle;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.peak-row {
+  background: rgba(139, 69, 255, 0.05) !important;
+  border-left: 3px solid #8b45ff;
+}
+
+.time-cell {
+  min-width: 120px;
+}
+
+.time-primary {
+  font-weight: 600;
+  color: #1a1a1a;
+  font-size: 0.9rem;
+}
+
+.time-secondary {
+  color: #666;
+  font-size: 0.8rem;
+}
+
+.prediction-cell {
+  text-align: center;
+}
+
+.prediction-value {
+  font-weight: 700;
+  color: #8b45ff;
+  font-size: 1.1rem;
+}
+
+.prediction-unit {
+  color: #666;
+  font-size: 0.8rem;
+  margin-left: 2px;
+}
+
+.cost-cell {
+  font-weight: 600;
+  color: #1a1a1a;
+  text-align: center;
+}
+
+.status-cell {
+  text-align: center;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.status-peak {
+  background: rgba(139, 69, 255, 0.1);
+  color: #8b45ff;
+}
+
+.status-high {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+.status-medium {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+.status-low {
+  background: rgba(74, 222, 128, 0.1);
+  color: #16a34a;
+}
+
+.recommendation-cell {
+  color: #666;
+  font-size: 0.9rem;
+  max-width: 200px;
+}
+
+/* No Data States */
+.no-forecast {
+  text-align: center;
+  color: #666;
+  padding: 40px 20px;
+}
+
+.no-data-icon {
+  font-size: 3rem;
+  color: rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .prediction-container {
+    padding: 0 5px;
+  }
+  
+  .card-header {
+    padding: 16px 20px 12px;
+  }
+  
+  .card-body {
+    padding: 20px;
+  }
+  
+  .peak-analysis {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .peak-recommendation {
+    grid-column: 1;
+  }
+  
+  .forecast-table {
+    font-size: 0.875rem;
+  }
+  
+  .time-cell {
+    min-width: 100px;
+  }
+}
+</style>
 {% endblock %}

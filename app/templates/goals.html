@@ -1,9 +1,40 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card shadow">
+<div class="card shadow-sm">
   <div class="card-body">
-    <h3>🎯 Goals & Progress</h3>
-    <p>Track your energy savings goals and milestones here.</p>
+    <h5 class="card-title">Your Energy Goals</h5>
+    <p>Total kWh (last 50 readings): <strong id="goal-total">--</strong></p>
+    <div id="badges" class="d-flex gap-3 flex-wrap"></div>
   </div>
 </div>
+
+<script>
+async function loadGoals(){
+  try {
+    const resp = await fetch("/api/goals");
+    if (!resp.ok) return;
+    const data = await resp.json();
+    document.getElementById("goal-total").innerText = data.total_kwh;
+
+    const badgeDiv = document.getElementById("badges");
+    badgeDiv.innerHTML = "";
+    (data.badges || []).forEach(b => {
+      const img = document.createElement("img");
+      img.src = b.image;
+      img.alt = b.name;
+      img.title = b.name;
+      img.style.height = "60px";
+      img.className = "rounded shadow-sm";
+      badgeDiv.appendChild(img);
+    });
+
+    if (!data.badges || data.badges.length === 0){
+      badgeDiv.innerHTML = "<p class='text-muted'>No badges yet — keep saving energy!</p>";
+    }
+  } catch (err) { console.error("Goals error", err); }
+}
+// refresh every 30s
+setInterval(loadGoals, 30000);
+loadGoals();
+</script>
 {% endblock %}

@@ -1,9 +1,30 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card shadow">
+<div class="card shadow-sm">
   <div class="card-body">
-    <h3>💡 Smart Recommendations</h3>
-    <p>Personalized suggestions for energy saving will be shown here.</p>
+    <h5 class="card-title">Smart Recommendations</h5>
+    <ul id="rec-list" class="list-group"></ul>
   </div>
 </div>
+
+<script>
+async function loadRecs(){
+  try {
+    const resp = await fetch("/api/recommendations");
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const ul = document.getElementById("rec-list");
+    ul.innerHTML = "";
+    (data.recommendations || []).forEach(r => {
+      const li = document.createElement("li");
+      li.className = "list-group-item";
+      li.textContent = r;
+      ul.appendChild(li);
+    });
+  } catch (err) { console.error("Recs error", err); }
+}
+// refresh every 15s
+setInterval(loadRecs, 15000);
+loadRecs();
+</script>
 {% endblock %}

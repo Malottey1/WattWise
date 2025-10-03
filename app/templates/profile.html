@@ -1,39 +1,869 @@
 {% extends "base.html" %}
 {% block content %}
-  <h2 class="mb-4">Profile</h2>
-
-  <div class="card shadow-sm mb-3">
-    <div class="card-body">
-      <h5 class="card-title">User Information</h5>
-      <p><strong>Username:</strong> {{ user.username }}</p>
-      <p><strong>Email:</strong> {{ user.email }}</p>
+<div class="profile-container">
+  <!-- Profile Header -->
+  <div class="profile-header mb-5">
+    <div class="row align-items-center">
+      <div class="col-auto">
+        <div class="profile-avatar">
+          <i class="fas fa-user"></i>
+        </div>
+      </div>
+      <div class="col">
+        <h1 class="page-title">{{ user.name }}'s Profile</h1>
+        <p class="page-subtitle">Energy management overview and achievements</p>
+      </div>
+      <div class="col-auto">
+        <div class="profile-stats">
+          <div class="stat-item">
+            <div class="stat-value">{{ active_devices_count }}</div>
+            <div class="stat-label">Active Devices</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="card shadow-sm mb-3">
-    <div class="card-body">
-      <h5 class="card-title">Your Devices</h5>
-      {% if devices %}
-        <ul>
-          {% for d in devices %}
-            <li>{{ d.device_name }} ({{ d.device_type }})</li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p>No devices registered.</p>
-      {% endif %}
+  <div class="row g-4">
+    <!-- Usage Summary -->
+    <div class="col-lg-8">
+      <div class="card summary-card">
+        <div class="card-header">
+          <i class="fas fa-chart-pie card-icon"></i>
+          <h5 class="card-title">Usage Summary</h5>
+        </div>
+        <div class="card-body">
+          {% if usage_summary %}
+            <div class="usage-grid">
+              {% for u in usage_summary %}
+              <div class="usage-item">
+                <div class="usage-icon">
+                  <i class="fas fa-plug"></i>
+                </div>
+                <div class="usage-details">
+                  <div class="usage-device">{{ u.device_name }}</div>
+                  <div class="usage-type">{{ u.device_type }}</div>
+                </div>
+                <div class="usage-metrics">
+                  <div class="usage-kwh">{{ u.kwh }} kWh</div>
+                  <div class="usage-cost">${{ u.cost }}</div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            <div class="usage-total mt-4">
+              <div class="total-label">Total This Period</div>
+              <div class="total-value">
+                {{ total_kwh }} kWh • ${{ total_cost }}
+              </div>
+            </div>
+          {% else %}
+            <div class="no-data">
+              <i class="fas fa-chart-pie no-data-icon"></i>
+              <p>No usage data available</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Goals Card -->
+    <div class="col-lg-4">
+      <div class="card goals-card">
+        <div class="card-header">
+          <i class="fas fa-bullseye card-icon"></i>
+          <h5 class="card-title">Daily Goals</h5>
+        </div>
+        <div class="card-body">
+          <div class="goal-progress">
+            <div class="progress-circle">
+              <svg width="120" height="120" viewBox="0 0 120 120">
+                <circle class="progress-bg" cx="60" cy="60" r="54"></circle>
+                <circle class="progress-fill" cx="60" cy="60" r="54" 
+                        stroke-dasharray="339.292" 
+                        stroke-dashoffset="{{ 339.292 * (1 - goals.progress / 100) }}"></circle>
+              </svg>
+              <div class="progress-text">
+                <div class="progress-percent">{{ goals.progress }}%</div>
+                <div class="progress-label">Complete</div>
+              </div>
+            </div>
+          </div>
+          <div class="goal-details">
+            <div class="goal-metric">
+              <div class="metric-label">Target</div>
+              <div class="metric-value" id="goal-target">{{ goals.goal }} kWh</div>
+            </div>
+            <div class="goal-metric">
+              <div class="metric-label">Current Usage</div>
+              <div class="metric-value" id="goal-usage">{{ goals.current_usage }} kWh</div>
+            </div>
+            <div class="goal-status">
+              <span class="status-badge status-{{ goals.status|lower }}" id="goal-status">
+                {{ goals.status }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="card shadow-sm">
+  <!-- Achievement Badges -->
+  <div class="card badges-card mt-4">
+    <div class="card-header">
+      <i class="fas fa-trophy card-icon"></i>
+      <h5 class="card-title">Achievement Badges</h5>
+    </div>
     <div class="card-body">
-      <h5 class="card-title">Usage Summary</h5>
-      {% if stats %}
-        <p>Total Readings: {{ stats.total_readings }}</p>
-        <p>Average Consumption: {{ "%.2f"|format(stats.avg_consumption) }} kWh</p>
-      {% else %}
-        <p>No usage data available yet.</p>
-      {% endif %}
+      <div class="badges-grid">
+        <div class="badge-item">
+          <div class="badge-icon bronze">
+            <i class="fas fa-medal"></i>
+          </div>
+          <div class="badge-info">
+            <div class="badge-name">Bronze Saver</div>
+            <div class="badge-desc">Save 5% energy for 7 days</div>
+          </div>
+          <div class="badge-progress">
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: 60%"></div>
+            </div>
+            <span class="progress-text">60%</span>
+          </div>
+        </div>
+        
+        <div class="badge-item">
+          <div class="badge-icon silver">
+            <i class="fas fa-medal"></i>
+          </div>
+          <div class="badge-info">
+            <div class="badge-name">Silver Saver</div>
+            <div class="badge-desc">Save 10% energy for 14 days</div>
+          </div>
+          <div class="badge-progress">
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: 30%"></div>
+            </div>
+            <span class="progress-text">30%</span>
+          </div>
+        </div>
+        
+        <div class="badge-item">
+          <div class="badge-icon gold">
+            <i class="fas fa-trophy"></i>
+          </div>
+          <div class="badge-info">
+            <div class="badge-name">Gold Saver</div>
+            <div class="badge-desc">Save 20% energy for 30 days</div>
+          </div>
+          <div class="badge-progress">
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: 15%"></div>
+            </div>
+            <span class="progress-text">15%</span>
+          </div>
+        </div>
+
+        <div class="badge-item">
+          <div class="badge-icon eco">
+            <i class="fas fa-leaf"></i>
+          </div>
+          <div class="badge-info">
+            <div class="badge-name">Eco Warrior</div>
+            <div class="badge-desc">Reduce carbon by 50kg</div>
+          </div>
+          <div class="badge-progress">
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: 80%"></div>
+            </div>
+            <span class="progress-text">80%</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
+
+  <div class="row g-4 mt-4">
+    <!-- Alerts Section -->
+    <div class="col-md-6">
+      <div class="card alerts-card">
+        <div class="card-header">
+          <i class="fas fa-bell card-icon"></i>
+          <h5 class="card-title">Recent Alerts</h5>
+          <span class="alert-count" id="alert-count">{% if alerts %}{{ alerts|length }}{% else %}0{% endif %}</span>
+        </div>
+        <div class="card-body">
+          <div class="alerts-list" id="alerts-section">
+            {% if alerts %}
+              {% for a in alerts %}
+              <div class="alert-item">
+                <div class="alert-icon">
+                  <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="alert-content">
+                  <div class="alert-message">{{ a.message }}</div>
+                  <div class="alert-meta">
+                    <span class="alert-device">{{ a.device_name }}</span>
+                    <span class="alert-time">{{ a.timestamp }}</span>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            {% else %}
+              <div class="no-alerts">
+                <i class="fas fa-check-circle no-data-icon"></i>
+                <p>No alerts right now 🎉</p>
+                <small class="text-muted">Everything is running smoothly</small>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recommendations Section -->
+    <div class="col-md-6">
+      <div class="card recommendations-card">
+        <div class="card-header">
+          <i class="fas fa-lightbulb card-icon"></i>
+          <h5 class="card-title">Smart Recommendations</h5>
+        </div>
+        <div class="card-body">
+          <div class="recommendations-list" id="recommendations-section">
+            {% if recommendations %}
+              {% for r in recommendations %}
+              <div class="recommendation-item">
+                <div class="recommendation-icon">
+                  <i class="fas fa-bolt"></i>
+                </div>
+                <div class="recommendation-content">
+                  <div class="recommendation-text">{{ r.suggestion }}</div>
+                  {% if r.device_name %}
+                  <div class="recommendation-device">{{ r.device_name }}</div>
+                  {% endif %}
+                </div>
+              </div>
+              {% endfor %}
+            {% else %}
+              <div class="no-recommendations">
+                <i class="fas fa-comment-alt no-data-icon"></i>
+                <p>No recommendations yet</p>
+                <small class="text-muted">Check back later for energy-saving tips</small>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Load goals
+    fetch("/api/goals")
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById("goal-target").innerText = data.goal + " kWh";
+            document.getElementById("goal-usage").innerText = data.current_usage + " kWh";
+            
+            // Update progress circle
+            const progressCircle = document.querySelector('.progress-fill');
+            const circumference = 339.292;
+            const offset = circumference * (1 - data.progress / 100);
+            progressCircle.style.strokeDashoffset = offset;
+            
+            // Update progress text
+            document.querySelector('.progress-percent').innerText = data.progress + '%';
+            document.getElementById("goal-status").innerText = data.status;
+            document.getElementById("goal-status").className = 'status-badge status-' + data.status.toLowerCase();
+        });
+
+    // Load alerts
+    fetch("/api/alerts")
+        .then(res => res.json())
+        .then(data => {
+            const section = document.getElementById("alerts-section");
+            const countElement = document.getElementById("alert-count");
+            
+            if (data.alerts && data.alerts.length === 0) {
+                section.innerHTML = `
+                  <div class="no-alerts">
+                    <i class="fas fa-check-circle no-data-icon"></i>
+                    <p>No alerts right now 🎉</p>
+                    <small class="text-muted">Everything is running smoothly</small>
+                  </div>
+                `;
+                countElement.innerText = "0";
+            } else if (data.alerts) {
+                let alertsHTML = '';
+                data.alerts.forEach(a => {
+                    alertsHTML += `
+                      <div class="alert-item">
+                        <div class="alert-icon">
+                          <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="alert-content">
+                          <div class="alert-message">${a.message}</div>
+                          <div class="alert-meta">
+                            <span class="alert-device">${a.device_name}</span>
+                            <span class="alert-time">${a.timestamp}</span>
+                          </div>
+                        </div>
+                      </div>
+                    `;
+                });
+                section.innerHTML = alertsHTML;
+                countElement.innerText = data.alerts.length;
+            }
+        });
+
+    // Load recommendations
+    fetch("/api/recommendations")
+        .then(res => res.json())
+        .then(data => {
+            const section = document.getElementById("recommendations-section");
+            
+            if (data.recommendations && data.recommendations.length === 0) {
+                section.innerHTML = `
+                  <div class="no-recommendations">
+                    <i class="fas fa-comment-alt no-data-icon"></i>
+                    <p>No recommendations yet</p>
+                    <small class="text-muted">Check back later for energy-saving tips</small>
+                  </div>
+                `;
+            } else if (data.recommendations) {
+                let recommendationsHTML = '';
+                data.recommendations.forEach(r => {
+                    recommendationsHTML += `
+                      <div class="recommendation-item">
+                        <div class="recommendation-icon">
+                          <i class="fas fa-bolt"></i>
+                        </div>
+                        <div class="recommendation-content">
+                          <div class="recommendation-text">${r.suggestion}</div>
+                          ${r.device_name ? `<div class="recommendation-device">${r.device_name}</div>` : ''}
+                        </div>
+                      </div>
+                    `;
+                });
+                section.innerHTML = recommendationsHTML;
+            }
+        });
+});
+</script>
+
+<style>
+.profile-container {
+  padding: 0 10px;
+}
+
+/* Profile Header */
+.profile-header {
+  padding: 20px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.profile-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8b45ff, #6c2bd9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 2rem;
+}
+
+.page-title {
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 4px;
+}
+
+.page-subtitle {
+  color: #666;
+  margin: 0;
+}
+
+.profile-stats {
+  text-align: center;
+}
+
+.stat-item {
+  padding: 16px;
+  background: rgba(139, 69, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(139, 69, 255, 0.1);
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #8b45ff;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: #666;
+  margin-top: 4px;
+}
+
+/* Card Styles */
+.summary-card, .goals-card, .badges-card, .alerts-card, .recommendations-card {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.summary-card:hover, .goals-card:hover, .badges-card:hover, .alerts-card:hover, .recommendations-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.card-header {
+  background: transparent;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 20px 24px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+}
+
+.card-icon {
+  color: #8b45ff;
+  font-size: 1.25rem;
+}
+
+.card-title {
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.card-body {
+  padding: 24px;
+}
+
+/* Usage Summary */
+.usage-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.usage-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 12px;
+  transition: background-color 0.2s ease;
+}
+
+.usage-item:hover {
+  background: rgba(139, 69, 255, 0.05);
+}
+
+.usage-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(139, 69, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8b45ff;
+  font-size: 1.25rem;
+}
+
+.usage-details {
+  flex: 1;
+}
+
+.usage-device {
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 2px;
+}
+
+.usage-type {
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.usage-metrics {
+  text-align: right;
+}
+
+.usage-kwh {
+  font-weight: 700;
+  color: #8b45ff;
+  font-size: 1.1rem;
+  margin-bottom: 2px;
+}
+
+.usage-cost {
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.usage-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: rgba(139, 69, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(139, 69, 255, 0.1);
+}
+
+.total-label {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.total-value {
+  font-weight: 700;
+  color: #8b45ff;
+  font-size: 1.2rem;
+}
+
+/* Goals */
+.goal-progress {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.progress-circle {
+  position: relative;
+  width: 120px;
+  height: 120px;
+}
+
+.progress-bg {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.1);
+  stroke-width: 8;
+}
+
+.progress-fill {
+  fill: none;
+  stroke: #8b45ff;
+  stroke-width: 8;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  transition: stroke-dashoffset 0.5s ease;
+}
+
+.progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.progress-percent {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1;
+}
+
+.progress-label {
+  font-size: 0.75rem;
+  color: #666;
+  margin-top: 2px;
+}
+
+.goal-details {
+  display: grid;
+  gap: 12px;
+}
+
+.goal-metric {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.goal-metric:last-child {
+  border-bottom: none;
+}
+
+.metric-label {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.metric-value {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.goal-status {
+  text-align: center;
+  margin-top: 8px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.status-ontrack {
+  background: rgba(74, 222, 128, 0.1);
+  color: #16a34a;
+}
+
+.status-behind {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+.status-exceeded {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+/* Badges */
+.badges-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.badge-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.badge-item:hover {
+  background: rgba(139, 69, 255, 0.05);
+  transform: translateY(-2px);
+}
+
+.badge-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: white;
+}
+
+.badge-icon.bronze {
+  background: linear-gradient(135deg, #cd7f32, #b56c2a);
+}
+
+.badge-icon.silver {
+  background: linear-gradient(135deg, #c0c0c0, #a8a8a8);
+}
+
+.badge-icon.gold {
+  background: linear-gradient(135deg, #ffd700, #e6c200);
+}
+
+.badge-icon.eco {
+  background: linear-gradient(135deg, #10b981, #0d9668);
+}
+
+.badge-info {
+  flex: 1;
+}
+
+.badge-name {
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 2px;
+}
+
+.badge-desc {
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.badge-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.progress-bar {
+  width: 80px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #8b45ff;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.75rem;
+  color: #666;
+  font-weight: 500;
+}
+
+/* Alerts & Recommendations */
+.alert-count {
+  background: #ef4444;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.alerts-list, .recommendations-list {
+  display: grid;
+  gap: 12px;
+}
+
+.alert-item, .recommendation-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 12px;
+  transition: background-color 0.2s ease;
+}
+
+.alert-item:hover, .recommendation-item:hover {
+  background: rgba(139, 69, 255, 0.05);
+}
+
+.alert-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ef4444;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.recommendation-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(139, 69, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8b45ff;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.alert-content, .recommendation-content {
+  flex: 1;
+}
+
+.alert-message, .recommendation-text {
+  color: #1a1a1a;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.alert-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.alert-device {
+  font-weight: 500;
+}
+
+.recommendation-device {
+  font-size: 0.75rem;
+  color: #666;
+  font-weight: 500;
+}
+
+/* No Data States */
+.no-data, .no-alerts, .no-recommendations {
+  text-align: center;
+  color: #666;
+  padding: 40px 20px;
+}
+
+.no-data-icon {
+  font-size: 3rem;
+  color: rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .profile-container {
+    padding: 0 5px;
+  }
+  
+  .card-header {
+    padding: 16px 20px 12px;
+  }
+  
+  .card-body {
+    padding: 20px;
+  }
+  
+  .badges-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .profile-header .row {
+    text-align: center;
+  }
+  
+  .profile-stats {
+    margin-top: 16px;
+  }
+  
+  .usage-item {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+  
+  .usage-metrics {
+    text-align: center;
+  }
+}
+</style>
 {% endblock %}
